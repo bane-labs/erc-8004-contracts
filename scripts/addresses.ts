@@ -1,5 +1,8 @@
 import { Hex } from "viem";
 
+export const NEO_X_T4_CHAIN_ID = 12227332;
+export const NEO_X_MAINNET_CHAIN_ID = 47763;
+
 /**
  * Mainnet chainIds - must be explicitly listed
  */
@@ -27,6 +30,7 @@ export const MAINNET_CHAIN_IDS = [
   295,    // Hedera
   1187947933, // SKALE Base
   360,        // Shape
+  NEO_X_MAINNET_CHAIN_ID, // Neo X
 ];
 
 /**
@@ -58,6 +62,7 @@ export const TESTNET_CHAIN_IDS = [
   324705682, // SKALE Base Sepolia
   5042002,   // Arc Testnet
   11011,     // Shape Sepolia
+  NEO_X_T4_CHAIN_ID, // Neo X T4
 ];
 
 /**
@@ -68,6 +73,24 @@ export const TESTNET_ADDRESSES = {
   identityRegistry: "0x8004A818BFB912233c491871b3d84c89A494BD9e",
   reputationRegistry: "0x8004B663056A597Dffe9eCcC1965A193B7388713",
   validationRegistry: "0x8004Cb1BF31DAf7788923b405b754f57acEB4272",
+} as const;
+
+/**
+ * Neo X T4 proxy addresses using the configured testnet owner.
+ */
+export const NEO_X_T4_ADDRESSES = {
+  identityRegistry: "0x8004A856a396D08d31E597a867B1D8273901e641",
+  reputationRegistry: "0x8004B62ee1EaE1E677B6A562f1008927C283F27A",
+  validationRegistry: "0x8004Cc3F06c8491c4540C822291Ba8e08E93cEfE",
+} as const;
+
+/**
+ * Neo X mainnet proxy addresses using the configured deployment owner.
+ */
+export const NEO_X_MAINNET_ADDRESSES = {
+  identityRegistry: "0x8004A13E76f6a04443eab72dc7cb3F9B051635c7",
+  reputationRegistry: "0x8004BA391d3C9F237f5e412AbdAfaBc918E6cD4A",
+  validationRegistry: "0x8004Cc5ac5fC4EB96FC2cE4615a1bb890263e719",
 } as const;
 
 /**
@@ -88,6 +111,24 @@ export const TESTNET_VANITY_SALTS = {
   identityRegistry: "0x000000000000000000000000000000000000000000000000000000000053bcdc" as Hex,
   reputationRegistry: "0x00000000000000000000000000000000000000000000000000000000003029ea" as Hex,
   validationRegistry: "0x000000000000000000000000000000000000000000000000000000000027f902" as Hex,
+} as const;
+
+/**
+ * Neo X T4 vanity salts using MinimalUUPSWithOwner and NEO_X_INITIAL_OWNER.
+ */
+export const NEO_X_T4_VANITY_SALTS = {
+  identityRegistry: "0x0000000000000000000000000000000000000000000000000000000004170651" as Hex,
+  reputationRegistry: "0x0000000000000000000000000000000000000000000000000000000000faf41b" as Hex,
+  validationRegistry: "0x00000000000000000000000000000000000000000000000000000000000d2a2a" as Hex,
+} as const;
+
+/**
+ * Neo X mainnet vanity salts using MinimalUUPSWithOwner and NEO_X_INITIAL_OWNER.
+ */
+export const NEO_X_MAINNET_VANITY_SALTS = {
+  identityRegistry: "0x00000000000000000000000000000000000000000000000000000000006a3d24" as Hex,
+  reputationRegistry: "0x00000000000000000000000000000000000000000000000000000000032a931e" as Hex,
+  validationRegistry: "0x00000000000000000000000000000000000000000000000000000000000172c0" as Hex,
 } as const;
 
 /**
@@ -121,9 +162,24 @@ export const MAINNET_MINIMAL_UUPS_SALT = "0x000000000000000000000000000000000000
 export const SAFE_SINGLETON_FACTORY = "0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7" as const;
 
 /**
- * Expected owner address
+ * Default owner used by the upstream deployments.
  */
 export const EXPECTED_OWNER = "0x547289319C3e6aedB179C0b8e8aF0B5ACd062603" as const;
+
+/**
+ * Initial deployment owner for Neo X.
+ */
+export const NEO_X_INITIAL_OWNER = "0x28E66288Cb1d1113E7c7E2EFa335e102Ad6Dd507" as const;
+
+/**
+ * Get the expected proxy owner for a given chainId.
+ */
+export function getExpectedOwner(chainId: number): Hex {
+  validateChainId(chainId);
+  return chainId === NEO_X_T4_CHAIN_ID || chainId === NEO_X_MAINNET_CHAIN_ID
+    ? NEO_X_INITIAL_OWNER
+    : EXPECTED_OWNER;
+}
 
 /**
  * Check if a chainId is a mainnet
@@ -167,6 +223,8 @@ export function getNetworkType(chainId: number): "mainnet" | "testnet" {
  */
 export function getAddresses(chainId: number) {
   validateChainId(chainId);
+  if (chainId === NEO_X_T4_CHAIN_ID) return NEO_X_T4_ADDRESSES;
+  if (chainId === NEO_X_MAINNET_CHAIN_ID) return NEO_X_MAINNET_ADDRESSES;
   return isMainnet(chainId) ? MAINNET_ADDRESSES : TESTNET_ADDRESSES;
 }
 
@@ -176,6 +234,8 @@ export function getAddresses(chainId: number) {
  */
 export function getVanitySalts(chainId: number) {
   validateChainId(chainId);
+  if (chainId === NEO_X_T4_CHAIN_ID) return NEO_X_T4_VANITY_SALTS;
+  if (chainId === NEO_X_MAINNET_CHAIN_ID) return NEO_X_MAINNET_VANITY_SALTS;
   return isMainnet(chainId) ? MAINNET_VANITY_SALTS : TESTNET_VANITY_SALTS;
 }
 
@@ -185,6 +245,9 @@ export function getVanitySalts(chainId: number) {
  */
 export function getMinimalUUPSContract(chainId: number): string {
   validateChainId(chainId);
+  if (chainId === NEO_X_T4_CHAIN_ID || chainId === NEO_X_MAINNET_CHAIN_ID) {
+    return "MinimalUUPSWithOwner";
+  }
   return isMainnet(chainId) ? "MinimalUUPSMainnet" : "MinimalUUPS";
 }
 
@@ -194,5 +257,8 @@ export function getMinimalUUPSContract(chainId: number): string {
  */
 export function getMinimalUUPSSalt(chainId: number): Hex {
   validateChainId(chainId);
+  if (chainId === NEO_X_T4_CHAIN_ID || chainId === NEO_X_MAINNET_CHAIN_ID) {
+    return TESTNET_MINIMAL_UUPS_SALT;
+  }
   return isMainnet(chainId) ? MAINNET_MINIMAL_UUPS_SALT : TESTNET_MINIMAL_UUPS_SALT;
 }

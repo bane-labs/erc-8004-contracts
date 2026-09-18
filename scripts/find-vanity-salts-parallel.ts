@@ -3,18 +3,38 @@ import { getCreate2Address, encodeFunctionData, keccak256, Hex, encodeAbiParamet
 import { Worker } from "worker_threads";
 import * as os from "os";
 import {
+  NEO_X_MAINNET_CHAIN_ID,
+  NEO_X_T4_CHAIN_ID,
   SAFE_SINGLETON_FACTORY,
-  TESTNET_MINIMAL_UUPS_SALT,
-  MAINNET_MINIMAL_UUPS_SALT,
+  getExpectedOwner,
+  getMinimalUUPSContract,
+  getMinimalUUPSSalt,
+  isMainnet,
+  validateChainId,
 } from "./addresses";
 
 /**
- * Select MinimalUUPS contract based on USE_MAINNET env var
- * Set USE_MAINNET=1 to mine salts for mainnet addresses
+ * Select the target chain's MinimalUUPS and owner configuration.
+ * TARGET_CHAIN_ID takes precedence; USE_MAINNET remains supported for existing workflows.
  */
-const USE_MAINNET = process.env.USE_MAINNET === "1";
-const MINIMAL_UUPS_CONTRACT = USE_MAINNET ? "MinimalUUPSMainnet" : "MinimalUUPS";
-const MINIMAL_UUPS_SALT = USE_MAINNET ? MAINNET_MINIMAL_UUPS_SALT : TESTNET_MINIMAL_UUPS_SALT;
+const TARGET_CHAIN_ID = Number(
+  process.env.TARGET_CHAIN_ID ?? (process.env.USE_MAINNET === "1" ? 1 : 11155111)
+);
+validateChainId(TARGET_CHAIN_ID);
+const USE_MAINNET = isMainnet(TARGET_CHAIN_ID);
+const MINIMAL_UUPS_CONTRACT = getMinimalUUPSContract(TARGET_CHAIN_ID);
+const MINIMAL_UUPS_SALT = getMinimalUUPSSalt(TARGET_CHAIN_ID);
+const EXPECTED_OWNER = getExpectedOwner(TARGET_CHAIN_ID);
+const IDENTITY_VANITY_PREFIX = TARGET_CHAIN_ID === NEO_X_T4_CHAIN_ID
+  ? "0x8004A8"
+  : TARGET_CHAIN_ID === NEO_X_MAINNET_CHAIN_ID
+    ? "0x8004A1"
+    : "0x8004A";
+const REPUTATION_VANITY_PREFIX = TARGET_CHAIN_ID === NEO_X_T4_CHAIN_ID
+  ? "0x8004B6"
+  : TARGET_CHAIN_ID === NEO_X_MAINNET_CHAIN_ID
+    ? "0x8004BA"
+    : "0x8004B";
 
 /**
  * Gets the deployment bytecode for a proxy contract
@@ -41,13 +61,12 @@ async function getProxyBytecode(
  * Search for vanity address in parallel using worker threads
  */
 function findVanitySaltParallel(
-  prefix: string,
+  checksummedPrefix: string,
   bytecode: Hex,
-  targetChar: string,
   numWorkers: number = os.cpus().length
 ): Promise<{ salt: Hex; address: string; iterations: number }> {
   return new Promise((resolve, reject) => {
-    console.log(`Searching for address with prefix: ${prefix} (uppercase ${targetChar})`);
+    console.log(`Searching for exact checksummed prefix: ${checksummedPrefix}`);
     console.log(`Using ${numWorkers} worker threads`);
 
     const workers: Worker[] = [];
@@ -59,17 +78,10 @@ function findVanitySaltParallel(
       const { parentPort, workerData } = require('worker_threads');
       const { getCreate2Address, keccak256 } = require('viem');
 
-      const { startSalt, factoryAddress, bytecode, prefix, targetChar } = workerData;
-
-      function hasUppercase(address, targetChar) {
-        if (address.length < 7) return false;
-        const char = address[6];
-        return char === targetChar;
-      }
+      const { startSalt, factoryAddress, bytecode, checksummedPrefix } = workerData;
 
       let salt = BigInt(startSalt);
       let iterations = 0;
-      const normalizedPrefix = prefix.toLowerCase();
       let found = false;
 
       while (!found) {
@@ -82,7 +94,7 @@ function findVanitySaltParallel(
           bytecodeHash: keccak256(bytecode),
         });
 
-        if (address.toLowerCase().startsWith(normalizedPrefix) && hasUppercase(address, targetChar)) {
+        if (address.startsWith(checksummedPrefix)) {
           parentPort.postMessage({
             type: 'found',
             salt: saltHex,
@@ -113,8 +125,7 @@ function findVanitySaltParallel(
           startSalt: i,
           factoryAddress: SAFE_SINGLETON_FACTORY,
           bytecode,
-          prefix,
-          targetChar
+          checksummedPrefix
         }
       });
 
@@ -160,9 +171,15 @@ async function main() {
 
   // Calculate MinimalUUPS address (single instance)
   console.log(`Step 0: Calculating ${MINIMAL_UUPS_CONTRACT} address...`);
+  console.log(`   Target chain ID: ${TARGET_CHAIN_ID}`);
   console.log(`   Mode: ${USE_MAINNET ? "MAINNET" : "TESTNET"}`);
+  console.log(`   Owner: ${EXPECTED_OWNER}`);
   const minimalUUPSArtifact = await hre.artifacts.readArtifact(MINIMAL_UUPS_CONTRACT);
   const minimalUUPSBytecode = minimalUUPSArtifact.bytecode as Hex;
+  const getInitializerArgs = (identityRegistry: `0x${string}`) =>
+    MINIMAL_UUPS_CONTRACT === "MinimalUUPSWithOwner"
+      ? [identityRegistry, EXPECTED_OWNER]
+      : [identityRegistry];
 
   const minimalUUPSAddress = getCreate2Address({
     from: SAFE_SINGLETON_FACTORY,
@@ -173,17 +190,17 @@ async function main() {
   console.log(`✅ ${MINIMAL_UUPS_CONTRACT}: ${minimalUUPSAddress}`);
   console.log("");
 
-  // Find salt for IdentityRegistry proxy (0x8004A)
+  // Find salt for IdentityRegistry proxy
   // Initialize with zero address
-  console.log("Step 1: Finding salt for IdentityRegistry (0x8004A)...");
+  console.log(`Step 1: Finding salt for IdentityRegistry (${IDENTITY_VANITY_PREFIX})...`);
   console.log("        Initialize with: 0x0000000000000000000000000000000000000000");
   const identityInitData = encodeFunctionData({
     abi: minimalUUPSArtifact.abi,
     functionName: "initialize",
-    args: ["0x0000000000000000000000000000000000000000" as `0x${string}`]
+    args: getInitializerArgs("0x0000000000000000000000000000000000000000")
   });
   const identityProxyBytecode = await getProxyBytecode(minimalUUPSAddress, identityInitData);
-  const identityResult = await findVanitySaltParallel("0x8004a", identityProxyBytecode, "A", numWorkers);
+  const identityResult = await findVanitySaltParallel(IDENTITY_VANITY_PREFIX, identityProxyBytecode, numWorkers);
   console.log("");
 
   // Calculate IdentityRegistry proxy address
@@ -196,17 +213,17 @@ async function main() {
   console.log(`✅ IdentityRegistry proxy will be at: ${identityProxyAddress}`);
   console.log("");
 
-  // Find salt for ReputationRegistry proxy (0x8004B)
+  // Find salt for ReputationRegistry proxy
   // Initialize with IdentityRegistry address
-  console.log("Step 3: Finding salt for ReputationRegistry (0x8004B)...");
+  console.log(`Step 3: Finding salt for ReputationRegistry (${REPUTATION_VANITY_PREFIX})...`);
   console.log(`        Initialize with: ${identityProxyAddress}`);
   const reputationInitData = encodeFunctionData({
     abi: minimalUUPSArtifact.abi,
     functionName: "initialize",
-    args: [identityProxyAddress]
+    args: getInitializerArgs(identityProxyAddress)
   });
   const reputationProxyBytecode = await getProxyBytecode(minimalUUPSAddress, reputationInitData);
-  const reputationResult = await findVanitySaltParallel("0x8004b", reputationProxyBytecode, "B", numWorkers);
+  const reputationResult = await findVanitySaltParallel(REPUTATION_VANITY_PREFIX, reputationProxyBytecode, numWorkers);
   console.log("");
 
   // Find salt for ValidationRegistry proxy (0x8004C)
@@ -216,10 +233,10 @@ async function main() {
   const validationInitData = encodeFunctionData({
     abi: minimalUUPSArtifact.abi,
     functionName: "initialize",
-    args: [identityProxyAddress]
+    args: getInitializerArgs(identityProxyAddress)
   });
   const validationProxyBytecode = await getProxyBytecode(minimalUUPSAddress, validationInitData);
-  const validationResult = await findVanitySaltParallel("0x8004c", validationProxyBytecode, "C", numWorkers);
+  const validationResult = await findVanitySaltParallel("0x8004C", validationProxyBytecode, numWorkers);
   console.log("");
 
   // Summary
@@ -232,23 +249,23 @@ async function main() {
   console.log("IdentityRegistry Proxy:");
   console.log("  Salt:    ", identityResult.salt);
   console.log("  Address: ", identityResult.address);
-  console.log(`  Init:     ${MINIMAL_UUPS_CONTRACT}.initialize(0x0000000000000000000000000000000000000000)`);
+  console.log(`  Owner:    ${EXPECTED_OWNER}`);
   console.log("");
   console.log("ReputationRegistry Proxy:");
   console.log("  Salt:    ", reputationResult.salt);
   console.log("  Address: ", reputationResult.address);
-  console.log(`  Init:     ${MINIMAL_UUPS_CONTRACT}.initialize(${identityProxyAddress})`);
+  console.log(`  Owner:    ${EXPECTED_OWNER}`);
   console.log("");
   console.log("ValidationRegistry Proxy:");
   console.log("  Salt:    ", validationResult.salt);
   console.log("  Address: ", validationResult.address);
-  console.log(`  Init:     ${MINIMAL_UUPS_CONTRACT}.initialize(${identityProxyAddress})`);
+  console.log(`  Owner:    ${EXPECTED_OWNER}`);
   console.log("");
   console.log("=".repeat(80));
   console.log("Next steps:");
-  console.log("1. Update VANITY_SALTS in scripts/deploy-vanity.ts");
-  console.log("2. Update EXPECTED_ADDRESSES in scripts/deploy-vanity.ts");
-  console.log("3. Update scripts/verify-vanity.ts with new addresses");
+  console.log("1. Add chain-specific addresses and salts to scripts/addresses.ts");
+  console.log("2. Run the deployment script; it will verify every CREATE2 address before sending");
+  console.log("3. Run scripts/verify-vanity.ts after deployment");
   console.log("");
 
   return {

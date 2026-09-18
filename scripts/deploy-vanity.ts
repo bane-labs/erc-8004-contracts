@@ -10,6 +10,7 @@ import {
   getVanitySalts,
   getMinimalUUPSContract,
   getMinimalUUPSSalt,
+  getExpectedOwner,
   getNetworkType,
 } from "./addresses";
 
@@ -34,6 +35,28 @@ async function getProxyBytecode(
   );
 
   return (proxyArtifact.bytecode + constructorArgs.slice(2)) as Hex;
+}
+
+function assertExpectedCreate2Address(
+  name: string,
+  salt: Hex,
+  bytecode: Hex,
+  expectedAddress: `0x${string}`,
+  chainId: number
+): void {
+  const calculatedAddress = getCreate2Address({
+    from: SAFE_SINGLETON_FACTORY,
+    salt,
+    bytecodeHash: keccak256(bytecode),
+  });
+
+  if (calculatedAddress.toLowerCase() !== expectedAddress.toLowerCase()) {
+    throw new Error(
+      `${name} CREATE2 configuration mismatch: expected ${expectedAddress}, ` +
+      `but the configured salt produces ${calculatedAddress}. ` +
+      `Run TARGET_CHAIN_ID=${chainId} npm run find-salts and update the chain's vanity salts before deploying.`
+    );
+  }
 }
 
 /**
@@ -94,12 +117,14 @@ async function main() {
   const VANITY_SALTS = getVanitySalts(chainId);
   const MINIMAL_UUPS_CONTRACT = getMinimalUUPSContract(chainId);
   const MINIMAL_UUPS_SALT = getMinimalUUPSSalt(chainId);
+  const expectedOwner = getExpectedOwner(chainId);
 
   console.log("Deploying ERC-8004 Contracts with Vanity Addresses (Deployer Phase)");
   console.log("=====================================================================");
   console.log("Network type:", networkType);
   console.log("Chain ID:", chainId);
   console.log("MinimalUUPS contract:", MINIMAL_UUPS_CONTRACT);
+  console.log("Proxy owner:", expectedOwner);
   console.log("Deployer address:", deployer.account.address);
   console.log("");
 
@@ -128,6 +153,10 @@ async function main() {
 
   const minimalUUPSArtifact = await hre.artifacts.readArtifact(MINIMAL_UUPS_CONTRACT);
   const minimalUUPSBytecode = minimalUUPSArtifact.bytecode as Hex;
+  const getInitializerArgs = (identityRegistry: `0x${string}`) =>
+    MINIMAL_UUPS_CONTRACT === "MinimalUUPSWithOwner"
+      ? [identityRegistry, expectedOwner]
+      : [identityRegistry];
 
   // Calculate MinimalUUPS address
   const minimalUUPSAddress = getCreate2Address({
@@ -173,9 +202,16 @@ async function main() {
     const identityInitData = encodeFunctionData({
       abi: minimalUUPSArtifact.abi,
       functionName: "initialize",
-      args: ["0x0000000000000000000000000000000000000000" as `0x${string}`]
+      args: getInitializerArgs("0x0000000000000000000000000000000000000000")
     });
     const identityProxyBytecode = await getProxyBytecode(minimalUUPSAddress, identityInitData);
+    assertExpectedCreate2Address(
+      "IdentityRegistry",
+      VANITY_SALTS.identityRegistry,
+      identityProxyBytecode,
+      identityProxyAddress,
+      chainId
+    );
     const identityProxyTxHash = await deployer.sendTransaction({
       to: SAFE_SINGLETON_FACTORY,
       data: (VANITY_SALTS.identityRegistry + identityProxyBytecode.slice(2)) as Hex,
@@ -199,9 +235,16 @@ async function main() {
     const reputationInitData = encodeFunctionData({
       abi: minimalUUPSArtifact.abi,
       functionName: "initialize",
-      args: [identityProxyAddress]
+      args: getInitializerArgs(identityProxyAddress)
     });
     const reputationProxyBytecode = await getProxyBytecode(minimalUUPSAddress, reputationInitData);
+    assertExpectedCreate2Address(
+      "ReputationRegistry",
+      VANITY_SALTS.reputationRegistry,
+      reputationProxyBytecode,
+      reputationProxyAddress,
+      chainId
+    );
     const reputationProxyTxHash = await deployer.sendTransaction({
       to: SAFE_SINGLETON_FACTORY,
       data: (VANITY_SALTS.reputationRegistry + reputationProxyBytecode.slice(2)) as Hex,
@@ -225,9 +268,16 @@ async function main() {
     const validationInitData = encodeFunctionData({
       abi: minimalUUPSArtifact.abi,
       functionName: "initialize",
-      args: [identityProxyAddress]
+      args: getInitializerArgs(identityProxyAddress)
     });
     const validationProxyBytecode = await getProxyBytecode(minimalUUPSAddress, validationInitData);
+    assertExpectedCreate2Address(
+      "ValidationRegistry",
+      VANITY_SALTS.validationRegistry,
+      validationProxyBytecode,
+      validationProxyAddress,
+      chainId
+    );
     const validationProxyTxHash = await deployer.sendTransaction({
       to: SAFE_SINGLETON_FACTORY,
       data: (VANITY_SALTS.validationRegistry + validationProxyBytecode.slice(2)) as Hex,

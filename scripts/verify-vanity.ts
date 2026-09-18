@@ -1,10 +1,6 @@
 import hre from "hardhat";
 import { createPublicClient, http } from "viem";
-import {
-  EXPECTED_OWNER,
-  getAddresses,
-  getNetworkType,
-} from "./addresses";
+import { getAddresses, getExpectedOwner, getNetworkType } from "./addresses";
 import { customChains } from "./custom-chains";
 
 /**
@@ -30,6 +26,7 @@ async function main() {
   const chainId = await publicClient.getChainId();
   const networkType = getNetworkType(chainId);
   const EXPECTED_ADDRESSES = getAddresses(chainId);
+  const expectedOwner = getExpectedOwner(chainId);
 
   console.log("Verifying ERC-8004 Vanity Deployment");
   console.log("=====================================");
@@ -98,10 +95,10 @@ async function main() {
       functionName: "owner",
       args: [],
     }) as `0x${string}`;
-    if (identityOwner.toLowerCase() === EXPECTED_OWNER.toLowerCase()) {
+    if (identityOwner.toLowerCase() === expectedOwner.toLowerCase()) {
       console.log(`   ✅ IdentityRegistry owner: ${identityOwner}`);
     } else {
-      console.log(`   ❌ IdentityRegistry owner mismatch: expected ${EXPECTED_OWNER}, got ${identityOwner}`);
+      console.log(`   ❌ IdentityRegistry owner mismatch: expected ${expectedOwner}, got ${identityOwner}`);
       allChecksPassed = false;
     }
 
@@ -111,10 +108,10 @@ async function main() {
       functionName: "owner",
       args: [],
     }) as `0x${string}`;
-    if (reputationOwner.toLowerCase() === EXPECTED_OWNER.toLowerCase()) {
+    if (reputationOwner.toLowerCase() === expectedOwner.toLowerCase()) {
       console.log(`   ✅ ReputationRegistry owner: ${reputationOwner}`);
     } else {
-      console.log(`   ❌ ReputationRegistry owner mismatch: expected ${EXPECTED_OWNER}, got ${reputationOwner}`);
+      console.log(`   ❌ ReputationRegistry owner mismatch: expected ${expectedOwner}, got ${reputationOwner}`);
       allChecksPassed = false;
     }
 
@@ -124,10 +121,10 @@ async function main() {
       functionName: "owner",
       args: [],
     }) as `0x${string}`;
-    if (validationOwner.toLowerCase() === EXPECTED_OWNER.toLowerCase()) {
+    if (validationOwner.toLowerCase() === expectedOwner.toLowerCase()) {
       console.log(`   ✅ ValidationRegistry owner: ${validationOwner}`);
     } else {
-      console.log(`   ❌ ValidationRegistry owner mismatch: expected ${EXPECTED_OWNER}, got ${validationOwner}`);
+      console.log(`   ❌ ValidationRegistry owner mismatch: expected ${expectedOwner}, got ${validationOwner}`);
       allChecksPassed = false;
     }
   } catch (error) {
