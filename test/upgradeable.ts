@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { network } from "hardhat";
-import { encodeAbiParameters, keccak256, toHex } from "viem";
+import { encodeAbiParameters, encodeFunctionData, keccak256, toHex } from "viem";
 
 describe("ERC8004 Upgradeable Registries", async function () {
   const { viem } = await network.connect();
@@ -73,6 +73,54 @@ describe("ERC8004 Upgradeable Registries", async function () {
 
     return await viem.getContractAt("ValidationRegistryUpgradeable", proxy.address);
   }
+
+  describe("MinimalUUPSWithOwner", async function () {
+    it("assigns the configured owner independently of the deployer", async function () {
+      const [deployer, configuredOwner] = await viem.getWalletClients();
+      const minimalImpl = await viem.deployContract("MinimalUUPSWithOwner");
+      const minimalInitCalldata = encodeFunctionData({
+        abi: [
+          {
+            type: "function",
+            name: "initialize",
+            stateMutability: "nonpayable",
+            inputs: [
+              { name: "identityRegistry_", type: "address" },
+              { name: "initialOwner_", type: "address" },
+            ],
+            outputs: [],
+          },
+        ],
+        functionName: "initialize",
+        args: ["0x0000000000000000000000000000000000000000", configuredOwner.account.address],
+      });
+      const proxy = await deployProxy(minimalImpl.address, minimalInitCalldata);
+      const minimalProxy = await viem.getContractAt("MinimalUUPSWithOwner", proxy.address);
+
+      assert.equal(
+        (await minimalProxy.read.owner()).toLowerCase(),
+        configuredOwner.account.address.toLowerCase()
+      );
+
+      const realImpl = await viem.deployContract("IdentityRegistryUpgradeable");
+      await assert.rejects(
+        minimalProxy.write.upgradeToAndCall(
+          [realImpl.address, encodeInitialize()],
+          { account: deployer.account }
+        )
+      );
+
+      await minimalProxy.write.upgradeToAndCall(
+        [realImpl.address, encodeInitialize()],
+        { account: configuredOwner.account }
+      );
+      const identityRegistry = await viem.getContractAt("IdentityRegistryUpgradeable", proxy.address);
+      assert.equal(
+        (await identityRegistry.read.owner()).toLowerCase(),
+        configuredOwner.account.address.toLowerCase()
+      );
+    });
+  });
 
   describe("IdentityRegistryUpgradeable", async function () {
     it("Should deploy through proxy and initialize", async function () {
