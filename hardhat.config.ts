@@ -15,10 +15,19 @@ const config: HardhatUserConfig = {
     },
     sourcify: {
       enabled: true,
-      apiUrl: "https://sourcify-api-monad.blockvision.org/",
+      apiUrl: process.env.SOURCIFY_API_URL || "https://sourcify.dev/server",
     }
   },
   chainDescriptors: {
+    12227332: {
+      name: "Neo X T4",
+      blockExplorers: {
+        blockscout: {
+          url: "https://xt4scan.ngd.network",
+          apiUrl: "https://xt4scan.ngd.network/api",
+        }
+      }
+    },
     1: {
       name: "Ethereum Mainnet",
       blockExplorers: {
@@ -792,6 +801,12 @@ const config: HardhatUserConfig = {
       chainType: "l1",
       url: process.env.ARC_TESTNET_RPC_URL || "https://rpc.testnet.arc.network",
       accounts: process.env.ARC_TESTNET_PRIVATE_KEY ? [process.env.ARC_TESTNET_PRIVATE_KEY] : [],
+    },
+    neoXT4: {
+      type: "http",
+      chainType: "l1",
+      url: process.env.NEO_X_T4_RPC_URL || "https://neoxt4seed1.ngd.network",
+      accounts: process.env.NEO_X_T4_PRIVATE_KEY ? [process.env.NEO_X_T4_PRIVATE_KEY] : [],
     },
   },
 };

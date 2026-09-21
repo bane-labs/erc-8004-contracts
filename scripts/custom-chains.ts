@@ -5,6 +5,23 @@ import { defineChain } from "viem";
  * Key must match the network name in hardhat.config.ts.
  */
 export const customChains: Record<string, ReturnType<typeof defineChain>> = {
+  neoXT4: defineChain({
+    id: 12227332,
+    name: "Neo X T4",
+    nativeCurrency: { name: "GAS", symbol: "GAS", decimals: 18 },
+    rpcUrls: {
+      default: {
+        http: [process.env.NEO_X_T4_RPC_URL || "https://neoxt4seed1.ngd.network"],
+      },
+    },
+    blockExplorers: {
+      default: {
+        name: "Neo X T4 Explorer",
+        url: "https://neoxt4scan.ngd.network",
+      },
+    },
+    testnet: true,
+  }),
   xlayerTestnet: defineChain({
     id: 1952,
     name: "XLayer Testnet",
