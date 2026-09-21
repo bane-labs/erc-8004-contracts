@@ -7,6 +7,7 @@ import {
   SAFE_SINGLETON_FACTORY,
   IMPLEMENTATION_SALTS,
   getAddresses,
+  getExpectedOwner,
   getNetworkType,
 } from "./addresses";
 import { customChains } from "./custom-chains";
@@ -43,6 +44,7 @@ async function main() {
   const chainId = await publicClient.getChainId();
   const networkType = getNetworkType(chainId);
   const EXPECTED_ADDRESSES = getAddresses(chainId);
+  const expectedOwner = getExpectedOwner(chainId);
 
   console.log("Upgrading ERC-8004 Vanity Proxies (Owner Phase)");
   console.log("================================================");
@@ -103,6 +105,13 @@ async function main() {
       },
     });
   }
+
+  if (ownerAccount.address.toLowerCase() !== expectedOwner.toLowerCase()) {
+    throw new Error(
+      `Owner signer mismatch: expected ${expectedOwner}, got ${ownerAccount.address}`
+    );
+  }
+
   const ownerWallet = custom
     ? createWalletClient({
         account: ownerAccount,
