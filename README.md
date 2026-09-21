@@ -4,6 +4,18 @@ Implementation of the ERC-8004 protocol for agent discovery and trust through re
 
 ### Contract Addresses
 
+This fork provides deterministic ERC-8004 deployments for Neo X. The T4 deployment is live and source-verified on [Neo X Scan](https://xt4scan.ngd.network). The mainnet addresses are deterministic deployment targets derived from the production build and remain pending until the live deployment has been completed and verified.
+
+#### Neo X Mainnet (planned)
+- **IdentityRegistry**: [`0x8004A13E76f6a04443eab72dc7cb3F9B051635c7`](https://xexplorer.neo.org/address/0x8004A13E76f6a04443eab72dc7cb3F9B051635c7)
+- **ReputationRegistry**: [`0x8004BA391d3C9F237f5e412AbdAfaBc918E6cD4A`](https://xexplorer.neo.org/address/0x8004BA391d3C9F237f5e412AbdAfaBc918E6cD4A)
+- **ValidationRegistry**: [`0x8004Cc5ac5fC4EB96FC2cE4615a1bb890263e719`](https://xexplorer.neo.org/address/0x8004Cc5ac5fC4EB96FC2cE4615a1bb890263e719)
+
+#### Neo X T4 Testnet
+- **IdentityRegistry**: [`0x8004A856a396D08d31E597a867B1D8273901e641`](https://xt4scan.ngd.network/address/0x8004A856a396D08d31E597a867B1D8273901e641)
+- **ReputationRegistry**: [`0x8004B62ee1EaE1E677B6A562f1008927C283F27A`](https://xt4scan.ngd.network/address/0x8004B62ee1EaE1E677B6A562f1008927C283F27A)
+- **ValidationRegistry**: [`0x8004Cc3F06c8491c4540C822291Ba8e08E93cEfE`](https://xt4scan.ngd.network/address/0x8004Cc3F06c8491c4540C822291Ba8e08E93cEfE)
+
 #### Ethereum Mainnet
 - **IdentityRegistry**: [`0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`](https://etherscan.io/address/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432)
 - **ReputationRegistry**: [`0x8004BAa17C55a88189AE136b182e5fdA19dE9b63`](https://etherscan.io/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63)
