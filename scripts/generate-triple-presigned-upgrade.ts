@@ -88,7 +88,7 @@ async function main() {
   const minimalUUPSArtifact = await hre.artifacts.readArtifact("MinimalUUPS");
 
   // Gas settings
-  const gasPrice = parseGwei("20"); // 20 gwei
+  const gasPrice = parseGwei("40"); // 40 gwei: Neo X base fee 20 + minimum tip 20
 
   // Encode initialize() calls for each implementation
   const identityInitData = encodeFunctionData({
